@@ -5,7 +5,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import requests
 import schedule
 
-SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/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"
+SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
+
 
 
 def generate_and_send_french():
