@@ -1,13 +1,14 @@
-import json
+import os
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import requests
 import schedule
 
-SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/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"
+SLACK_WEBHOOK_URL = "你的_SLACK_WEBHOOK_URL"
 
 
 def generate_and_send_french():
-    # 這是先前的大模型生成與發送 Slack 邏輯
     sample_data = {
         "sentences": [
             {
@@ -57,14 +58,38 @@ def generate_and_send_french():
     print("法語推播成功！")
 
 
-# 設定每天早上 08:30 執行（注意：雲端伺服器預設通常是 UTC 時間，00:30 UTC = 08:30 台灣時間）
+# --- 🛠️ 專為 Render 免費版設計的偽裝網頁伺服器 ---
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
+
+
+def run_web_server():
+    # 自動讀取 Render 提供給免費 Web Service 的 Port 號碼
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandler)
+    print(f"偽裝網頁伺服器已啟動，監聽 Port: {port}")
+    server.serve_forever()
+
+
+# ---------------------------------------------------
+
+# 設定排程：每天台灣時間早上 08:30 執行（00:30 UTC）
 schedule.every().day.at("00:30").do(generate_and_send_french)
 
 if __name__ == "__main__":
-    # 首次啟動先發送一次，確保設定成功
+    # 1. 先跑一次測試，確認 Slack 有收到
     generate_and_send_french()
 
-    # 讓程式保持在背景常駐執行，等待排程時間
+    # 2. 開啟另一個背景執行緒，常駐啟動網頁通訊埠（解決 Render Port 錯誤）
+    web_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_thread.start()
+
+    # 3. 保持主程式在背景常駐，等待每天定時排程
     while True:
         schedule.run_pending()
         time.sleep(60)
