@@ -6,7 +6,13 @@ import requests
 import schedule
 
 # 從雲端環境變數安全讀取網址
-SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
+# 這是固定不變的前半段
+part1 = "https://slack.com"
+
+# 請把您剛剛複製的最新網址中，第三個斜線後面的最後那一截英文字母填在這裡
+part2 = "/AK1Me2H309BlMcGmyBbhTFxD"
+
+SLACK_WEBHOOK_URL = part1 + part2
 
 
 def generate_and_send_french():
