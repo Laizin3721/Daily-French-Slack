@@ -79,7 +79,7 @@ def run_web_server():
 # ---------------------------------------------------
 
 # 設定排程：每天台灣時間早上 08:30 執行（00:30 UTC）
-schedule.every().day.at("00:30").do(generate_and_send_french)
+schedule.every(1).minutes.do(generate_and_send_french)
 
 if __name__ == "__main__":
     # 1. 先跑一次測試，確認 Slack 有收到
