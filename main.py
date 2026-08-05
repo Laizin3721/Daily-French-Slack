@@ -5,11 +5,16 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import requests
 import schedule
 
+# 從雲端環境變數安全讀取網址
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
 
 
-
 def generate_and_send_french():
+    # 確保有網址才執行，避免 None 導致崩潰
+    if not SLACK_WEBHOOK_URL:
+        print("【錯誤】找不到 Slack Webhook 網址，請檢查 Render 的 Environment 設定！")
+        return
+
     sample_data = {
         "sentences": [
             {
@@ -55,11 +60,14 @@ def generate_and_send_french():
             ]
         )
 
-    requests.post(SLACK_WEBHOOK_URL, json={"blocks": blocks})
-    print("法語推播成功！")
+    try:
+        response = requests.post(SLACK_WEBHOOK_URL, json={"blocks": blocks})
+        print(f"【系統】嘗試發送至 Slack，回應碼: {response.status_code}")
+    except Exception as e:
+        print(f"【系統】發送失敗，原因: {e}")
 
 
-# --- 🛠️ 專為 Render 免費版設計的偽裝網頁伺服器 ---
+# --- 🛠️ 專為 Render 免費版設計的網頁伺服器 ---
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
@@ -68,29 +76,37 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"Bot is alive!")
 
+    # 補上 HEAD 方法，徹底解決 Render 的 501 錯誤
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+
 
 def run_web_server():
-    # 自動讀取 Render 提供給免費 Web Service 的 Port 號碼
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandler)
-    print(f"偽裝網頁伺服器已啟動，監聽 Port: {port}")
+    print(f"【網頁】偽裝伺服器已啟動，監聽 Port: {port}")
     server.serve_forever()
 
 
 # ---------------------------------------------------
 
-# 設定排程：每天台灣時間早上 08:30 執行（00:30 UTC）
+# 設定排程：每 1 分鐘執行一次測試
 schedule.every(1).minutes.do(generate_and_send_french)
 
 if __name__ == "__main__":
-    # 1. 先跑一次測試，確認 Slack 有收到
-    generate_and_send_french()
-
-    # 2. 開啟另一個背景執行緒，常駐啟動網頁通訊埠（解決 Render Port 錯誤）
+    # 步驟一：【最優先】立刻啟動網頁伺服器執行緒，秒回 Render 的健康檢查
     web_thread = threading.Thread(target=run_web_server, daemon=True)
     web_thread.start()
 
-    # 3. 保持主程式在背景常駐，等待每天定時排程
+    # 步驟二：讓雲端緩衝 5 秒，確保環境變數完全載入
+    time.sleep(5)
+
+    # 步驟三：首次主動執行一次
+    generate_and_send_french()
+
+    # 步驟四：進入排程無窮迴圈
     while True:
         schedule.run_pending()
-        time.sleep(60)
+        time.sleep(1)
